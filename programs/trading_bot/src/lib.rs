@@ -1,10 +1,12 @@
+// lib.rs
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 use std::str::FromStr;
 
-declare_id!("99PTuyJM1sTazvaLnyTNWixTtCJSrMBLGfZJfxfsbZiB");
+declare_id!("497cyv12aNpr31KHVJYbRJot1QhpEiVohb2h4zkb4NZh");
 
 #[program]
 pub mod trading_bot {
@@ -36,11 +38,13 @@ pub mod trading_bot {
             &[&[b"flashloan-seed"]],
         )?;
 
+        // Emit a FlashloanEvent to track the flashloan
         emit!(FlashloanEvent {
             borrower: ctx.accounts.borrower.key(),
             amount,
         });
 
+        // Execute each trade action in sequence
         for action in actions {
             match action {
                 TradeAction::Buy => {
@@ -88,6 +92,7 @@ pub struct Trade<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// Flashloan instruction construction
 fn flashloan_instruction(
     flashloan_program_id: Pubkey,
     borrower: Pubkey,
