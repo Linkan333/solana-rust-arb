@@ -5,13 +5,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-trading_bot = "497cyv12aNpr31KHVJYbRJot1QhpEiVohb2h4zkb4NZh"
+trading_bot = "2hauxGhmk9heVJV6a7XN9kzj2CzckVjvhVrij595C4Su"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://solana-devnet.g.alchemy.com/v2/jGiW2kM8P4SSDUlQRTTg1gsCHq-wq5bm"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 tx_timeout = 120_000
 
