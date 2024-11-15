@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-trading_bot = "2hauxGhmk9heVJV6a7XN9kzj2CzckVjvhVrij595C4Su"
+trading_bot = "Eb6tqzqd45Ax4ATKLeE5VNy8K9ppPTEUZujHJFpL7qrZ"
 
 [registry]
 url = "https://api.apr.dev"
