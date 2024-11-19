@@ -15,6 +15,9 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 tx_timeout = 120_000
 
+[deploy]
+buffer_signer = "~/solana-rust-arb/buffer-keypair.json"
+
 [test]
 log = true
 

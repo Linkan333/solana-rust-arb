@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
+use anchor_spl::token::{Token};
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program::invoke_signed;
 use std::str::FromStr;
@@ -14,7 +14,7 @@ pub mod trading_bot {
         msg!("Starting transaction for buy/sell actions...");
         msg!("Flashloan Program ID: {:?}", ctx.accounts.flashloan_program.key());
         msg!("Borrower: {:?}", ctx.accounts.borrower.key());
-        msg!("Flashloan: {:?}", ctx.accounts.flashloan.key());
+        msg!("Flashloan PDA: {:?}", ctx.accounts.flashloan.key());
         msg!("Amount: {:?}", amount);
 
         // Execute flashloan logic
@@ -25,10 +25,10 @@ pub mod trading_bot {
                 ctx.accounts.destination_liquidity.key(),
                 ctx.accounts.reserve.key(),
                 ctx.accounts.lending_market.key(),
-                ctx.accounts.lending_market_authority.key(),
+                ctx.accounts.lending_market_authority.key(), // Reintroduced
                 ctx.accounts.token_program.key(),
                 amount,
-                *ctx.program_id, // Dereference ctx.program_id here
+                *ctx.program_id,
                 vec![],
             )?,
             &[
@@ -36,11 +36,11 @@ pub mod trading_bot {
                 ctx.accounts.destination_liquidity.to_account_info(),
                 ctx.accounts.reserve.to_account_info(),
                 ctx.accounts.lending_market.to_account_info(),
-                ctx.accounts.lending_market_authority.to_account_info(),
+                ctx.accounts.lending_market_authority.to_account_info(), // Reintroduced
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.borrower.to_account_info(),
             ],
-            &[],
+            &[&[b"flashloan-seed", &[ctx.bumps.flashloan]]],
         )?;
 
         // Emit a FlashloanEvent to track the flashloan
@@ -69,9 +69,32 @@ pub mod trading_bot {
 
         // Repay the flashloan
         msg!("Repaying flashloan...");
-        // Implement repayment logic here
+        invoke_signed(
+            &repay_flashloan_instruction(
+                ctx.accounts.flashloan_program.key(),
+                ctx.accounts.source_liquidity.key(),
+                ctx.accounts.destination_liquidity.key(),
+                ctx.accounts.reserve.key(),
+                ctx.accounts.lending_market.key(),
+                ctx.accounts.lending_market_authority.key(), // Reintroduced
+                ctx.accounts.token_program.key(),
+                amount,
+                *ctx.program_id,
+                vec![],
+            )?,
+            &[
+                ctx.accounts.source_liquidity.to_account_info(),
+                ctx.accounts.destination_liquidity.to_account_info(),
+                ctx.accounts.reserve.to_account_info(),
+                ctx.accounts.lending_market.to_account_info(),
+                ctx.accounts.lending_market_authority.to_account_info(), // Reintroduced
+                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.borrower.to_account_info(),
+            ],
+            &[&[b"flashloan-seed", &[ctx.bumps.flashloan]]],
+        )?;
 
-        msg!("Transaction completed with flashloan repayment.");
+        msg!("Transaction completed successfully.");
         Ok(())
     }
 }
@@ -93,7 +116,7 @@ pub enum TradeAction {
 pub struct Trade<'info> {
     #[account(mut)]
     pub buyer: Signer<'info>,
-    /// CHECK: For demonstration purposes.
+    /// CHECK: Seller account for demonstration purposes.
     pub seller: AccountInfo<'info>,
     /// CHECK: Mutable account for flashloan logic.
     #[account(mut)]
@@ -120,20 +143,20 @@ pub struct Trade<'info> {
     /// CHECK: Lending market account.
     pub lending_market: AccountInfo<'info>,
     /// CHECK: Derived lending market authority.
-    pub lending_market_authority: AccountInfo<'info>,
+    pub lending_market_authority: AccountInfo<'info>, // Reintroduced
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-}
-
-#[event]
-pub struct TradeActionEvent {
-    pub action_type: String,
 }
 
 #[event]
 pub struct FlashloanEvent {
     pub borrower: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct TradeActionEvent {
+    pub action_type: String,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -148,7 +171,7 @@ fn flashloan_instruction(
     destination_liquidity_pubkey: Pubkey,
     reserve_pubkey: Pubkey,
     lending_market_pubkey: Pubkey,
-    lending_market_authority_pubkey: Pubkey,
+    lending_market_authority_pubkey: Pubkey, // Reintroduced
     token_program_id: Pubkey,
     amount: u64,
     flash_loan_receiver_program_id: Pubkey,
@@ -165,7 +188,44 @@ fn flashloan_instruction(
         AccountMeta::new(destination_liquidity_pubkey, true),
         AccountMeta::new(reserve_pubkey, false),
         AccountMeta::new(lending_market_pubkey, false),
-        AccountMeta::new_readonly(lending_market_authority_pubkey, false),
+        AccountMeta::new_readonly(lending_market_authority_pubkey, false), // Reintroduced
+        AccountMeta::new_readonly(token_program_id, false),
+        AccountMeta::new_readonly(flash_loan_receiver_program_id, false),
+    ];
+
+    accounts.extend(flash_loan_receiver_program_accounts);
+
+    Ok(Instruction {
+        program_id: flashloan_program_id,
+        accounts,
+        data,
+    })
+}
+
+fn repay_flashloan_instruction(
+    flashloan_program_id: Pubkey,
+    source_liquidity_pubkey: Pubkey,
+    destination_liquidity_pubkey: Pubkey,
+    reserve_pubkey: Pubkey,
+    lending_market_pubkey: Pubkey,
+    lending_market_authority_pubkey: Pubkey, // Reintroduced
+    token_program_id: Pubkey,
+    amount: u64,
+    flash_loan_receiver_program_id: Pubkey,
+    flash_loan_receiver_program_accounts: Vec<AccountMeta>,
+) -> Result<Instruction> {
+    let data = FlashLoanInstructionData {
+        instruction: 10, // Assuming instruction code 10 for repayment in Solend
+        amount: amount + (amount / 100), // Including a 1% fee for the loan
+    }
+    .try_to_vec()?; // Serialize the struct
+
+    let mut accounts = vec![
+        AccountMeta::new(source_liquidity_pubkey, false),
+        AccountMeta::new(destination_liquidity_pubkey, true),
+        AccountMeta::new(reserve_pubkey, false),
+        AccountMeta::new(lending_market_pubkey, false),
+        AccountMeta::new_readonly(lending_market_authority_pubkey, false), // Reintroduced
         AccountMeta::new_readonly(token_program_id, false),
         AccountMeta::new_readonly(flash_loan_receiver_program_id, false),
     ];
